@@ -1,10 +1,18 @@
+# -*- coding: utf-8 -*-
+""" Collection of python utility functions.
+
+...
+"""
+
+# Basic include(s)
+import sys
+import math
+
 from ROOT  import *
 from array import *
 from collections import namedtuple
 
-import math
-import sys
-
+# Scientific include(s); require correct python environment
 try:
     import numpy as np
     from numpy.lib.recfunctions import append_fields
@@ -12,24 +20,35 @@ try:
     from root_numpy import tree2array
 except:
     print "ERROR: Scientific python packages were not set up properly."
-    print " $ source ~/pythonenv.sh"
+    print " $ source snippets/pythonenv.sh"
     print "or see e.g. [http://rootpy.github.io/root_numpy/start.html]."
     raise
-    pass
-
-
-# Global utility variables.
-eps = 1E-09
-pi  = 3.14159265359
 
 # Utility functions.
 def wait ():
-    ''' Generic wait function. '''
+    """ Generic wait function.
+
+    Halts the execution of the script until the user presses ``Enter``.
+    """
     raw_input('...')
     return
 
 
 def validateArguments(args):
+    """ Function to validate commandline arguments passed to generic script.
+
+    Checks whether the number of arguments is exactly one (i.e. only the script
+    name itself). Assumes that at least one path to a ROOT file is needed.
+
+    Args:
+        args: Commandline arguments, from sys.argv
+
+    Return:
+        None
+
+    Raise:
+        IOError: Only one argument was provided.
+    """
     if len(args) == 1:
         msg  = "Please specify at least one target ROOT file. Run as:\n"
         msg += " $ python %s path/to/file.root" % args[0]
@@ -38,9 +57,9 @@ def validateArguments(args):
 
 
 def loadXsec (path):
-    ''' Load cross section weights from file. '''
+    """ Load cross section weights from file. """
     xsec = dict()
-    with open(path, 'r') as f:
+    with open(path, 'r') as f:y
         for l in f:
             line = l.strip()
             if line == '' or line.startswith('#'):
@@ -60,7 +79,7 @@ def loadXsec (path):
 
 
 def getMaximum (h):
-    ''' Get *actual* maximum bin in histogram or similar. '''
+    """ Get *actual* maximum bin in histogram or similar. """
     if type(h) in [TF1, TEfficiency]:
         return -1
     N = h.GetXaxis().GetNbins()
@@ -69,7 +88,7 @@ def getMaximum (h):
 
 
 def drawText (lines = [], c = None, pos = 'NW', qualifier = 'Internal simulation'):
-    ''' Draw text on TPad, including ATLAS line. '''
+    """ Draw text on TPad, including ATLAS line. """
     if not c: c = gPad
     c.cd()
 
@@ -114,7 +133,7 @@ def drawLegend (histograms, names, types = None, c = None,
                 horisontal = 'R',
                 vertical   = 'T',
                 width = 0.30):
-    ''' Draw legend on TPad. '''
+    """ Draw legend on TPad. """
     if not c: c = gPad
     c.cd()
 
@@ -203,7 +222,7 @@ def drawLegend (histograms, names, types = None, c = None,
 
 
 def getPlotMinMax (histograms, log, padding = None, ymin = None):
-    ''' Get optimal y-axis plotting range given list of histograms (or sim.). '''
+    """ Get optimal y-axis plotting range given list of histograms (or sim.). """
     padding = padding if padding else 1.0
     ymax = max(map(getMaximum, histograms))
     ymin = (ymin if ymin is not None else (1e-05 if log else 0.))
@@ -246,7 +265,7 @@ def makePlot (pathHistnamePairs,
               drawOpts = None,
               normalise = False,
               profileRMS = False):
-    ''' ... '''
+    """ ... """
 
     # Variable declarations
     if not colours:
@@ -296,7 +315,7 @@ def makePlot (pathHistnamePairs,
                 # -- Get histogram.
                 print "histname: '%s'" % histname
                 h = f.Get(histname)
-                ''' If TTree? '''
+                """ If TTree? """
                 
                 # -- Keep in memory after file is closed.
                 h.SetDirectory(0)
@@ -548,7 +567,7 @@ def loadDataFast (paths, treename, branches, prefix = '', xsec = None, ignore = 
 
 
 def loadData (paths, treename, variables, prefix = '', xsec = None, ignore = None, DSIDvar = 'DSID', Nevents = None):
-    ''' Read in data arrays from TTree. '''
+    """ Read in data arrays from TTree. """
     values = dict()
 
     print ""
