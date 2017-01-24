@@ -34,7 +34,7 @@ def wait ():
     return
 
 
-def validateArguments(args):
+def validateArguments (args):
     """ Function to validate commandline arguments passed to generic script.
 
     Checks whether the number of arguments is exactly one (i.e. only the script
@@ -59,7 +59,7 @@ def validateArguments(args):
 def loadXsec (path):
     """ Load cross section weights from file. """
     xsec = dict()
-    with open(path, 'r') as f:y
+    with open(path, 'r') as f:
         for l in f:
             line = l.strip()
             if line == '' or line.startswith('#'):
