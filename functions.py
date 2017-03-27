@@ -24,6 +24,10 @@ except:
     print "or see e.g. [http://rootpy.github.io/root_numpy/start.html]."
     raise
 
+# Global variables
+colours = [kViolet + 7, kAzure + 7, kTeal, kSpring - 2, kOrange - 3, kPink]
+
+
 # Utility functions.
 def wait ():
     """ Generic wait function.
@@ -68,9 +72,11 @@ def loadXsec (path):
             try:
                 if int(fields[2]) == 0:
                     continue
-                xsec[int(fields[0])] = float(fields[1]) / float(fields[2]) * float(fields[3])
+                #xsec[int(fields[0])] = float(fields[1]) / float(fields[2]) * float(fields[3])
+                xsec[int(fields[0])] = float(fields[1]) / float(fields[3]) # @TEMP: Assuming sum-of-weights normalisation included in per-event MC weights
             except:
-                # If data.
+                # If data. (Ignore?)
+                xsec[int(fields[0])] = float(fields[1]) # 1.
                 continue
             pass
         pass
@@ -82,6 +88,8 @@ def getMaximum (h):
     """ Get *actual* maximum bin in histogram or similar. """
     if type(h) in [TF1, TEfficiency]:
         return -1
+    if type(h) in [TGraph, TGraphErrors]:
+        return h.GetMaximum()
     N = h.GetXaxis().GetNbins()
     return max([h.GetBinContent(i + 1) for i in range(N)])
 
@@ -109,7 +117,7 @@ def drawText (lines = [], c = None, pos = 'NW', qualifier = 'Internal simulation
     x =       c.GetLeftMargin() + offset * scale
     y = 1.0 - c.GetTopMargin()  - offset - t.GetTextSize() * 1.0
 
-    t.DrawLatexNDC(x, y, "#scale[1.15]{#font[72]{ATLAS} }#scale[1.05]{%s}" % qualifier)
+    t.DrawLatexNDC(x, y, "#scale[1.15]{#font[72]{ATLAS}}#scale[1.05]{  %s}" % qualifier)
     y -= ystep * 1.25
 
     for line in lines:
@@ -224,6 +232,7 @@ def drawLegend (histograms, names, types = None, c = None,
 def getPlotMinMax (histograms, log, padding = None, ymin = None):
     """ Get optimal y-axis plotting range given list of histograms (or sim.). """
     padding = padding if padding else 1.0
+
     ymax = max(map(getMaximum, histograms))
     ymin = (ymin if ymin is not None else (1e-05 if log else 0.))
 
@@ -250,6 +259,7 @@ def makePlot (pathHistnamePairs,
               canvas = None,
               ymin = None,
               ymax = None,
+              xlim = None,
               logy = False,
               padding = None,
               xtitle = None,
@@ -259,6 +269,7 @@ def makePlot (pathHistnamePairs,
               fillcolours = None, 
               alpha = None,
               linewidths = None,
+              linestyles = None,
               markers = None,
               xlines = None,
               ylines = None,
@@ -283,6 +294,10 @@ def makePlot (pathHistnamePairs,
         linewidths = [2] * len(pathHistnamePairs)
         pass
 
+    if not linestyles:
+        linestyles = [1] * len(pathHistnamePairs)
+        pass
+
     if fillcolours:
         if not type(fillcolours) == list:
             fillcolours = [fillcolours] * len(pathHistnamePairs)
@@ -291,6 +306,14 @@ def makePlot (pathHistnamePairs,
 
     if not type(alpha) == list:
         alpha = [alpha] * len(pathHistnamePairs)
+        pass
+
+    if not drawOpts:
+        drawOpts = ''
+        pass
+
+    if type(drawOpts) is str:
+        drawOpts = [drawOpts] * len(pathHistnamePairs) # len(histograms)
         pass
 
     # Loop all pairs of paths and histograms.
@@ -327,24 +350,28 @@ def makePlot (pathHistnamePairs,
                 
                 pass
 
-            # Common, regardless of how the histogram was obtained.
-            # -- Normalise.
-            if normalise and h.Integral() > 0:
-                h.Scale(1./h.Integral(0, h.GetXaxis().GetNbins() + 1))
-                pass
-            
-            # -- Make TProfile show RMS
-            if isinstance(h, TProfile) and profileRMS:
-                h.SetErrorOption('s')
-                pass
-
             # -- Append to list of histograms to be plotted.
-            histograms.append(h)
-            
+            histograms.append(h)            
             pass    
     else:
         histograms = pathHistnamePairs
         pass
+
+
+    # Common, regardless of how the histogram was obtained.
+    for h in histograms:
+        # -- Normalise.
+        if normalise and h.Integral() > 0:
+            h.Scale(1./h.Integral(0, h.GetXaxis().GetNbins() + 1))
+            pass
+    
+        # -- Make TProfile show RMS
+        if isinstance(h, TProfile) and profileRMS:
+            h.SetErrorOption('s')
+            pass
+
+        pass
+
 
     # Style.
     (ymin, _ymax) = getPlotMinMax(histograms, logy, ymin = ymin, padding = padding)
@@ -370,6 +397,9 @@ def makePlot (pathHistnamePairs,
 
             h.SetMarkerStyle(markers[i])
             h.SetLineWidth  (linewidths[i])
+            h.SetLineStyle  (linestyles[i])
+
+            #h.GetXaxis().SetNdivisions(505)
             pass
 
         # -- Axes.
@@ -381,6 +411,10 @@ def makePlot (pathHistnamePairs,
             continue
         if xtitle: h.GetXaxis().SetTitle(xtitle)
         if ytitle: h.GetYaxis().SetTitle(ytitle)
+
+        if normalise:
+            h.GetYaxis().SetTitle(h.GetYaxis().GetTitle() + ' (normalised)')
+            pass
 
         h.GetYaxis().SetRangeUser(ymin, ymax)
 
@@ -402,9 +436,10 @@ def makePlot (pathHistnamePairs,
 
     # Draw axes.
     histograms[0].Draw('AXIS')
-    #for i,h in enumerate(histograms):
-    #    h.Draw(drawOpt + ('SAME' if i > 0 else ''))
-    #    pass
+    if xlim:
+        c.Update()
+        histograms[0].GetXaxis().SetRangeUser(xlim[0], xlim[1])
+        pass
 
     # Lines
     if xlines or ylines:
@@ -435,20 +470,16 @@ def makePlot (pathHistnamePairs,
 
         pass
 
-    if not drawOpts:
-        drawOpts = ''
-        pass
-
-    if type(drawOpts) is str:
-        drawOpts = [drawOpts] * len(histograms)
-        pass
-
     # Draw histograms.
     for i, (drawOpt, h) in enumerate(zip(drawOpts,histograms)):
-        h.Draw(drawOpt + ' SAME')
+        #h.Draw(drawOpt + ' SAME')
+        h.Draw((drawOpt.replace('A', '') if i > 0 else drawOpt) + ' SAME') # TEMP
         pass
 
-    histograms[0].Draw('AXIS SAME')
+    # Drawing axes for TGraph fucks up
+    if type(histograms[0]) in [TH1, TH2, TEfficiency]:
+        histograms[0].Draw('AXIS SAME')
+        pass
 
     # Text.
     if textOpts:
@@ -467,13 +498,13 @@ def makePlot (pathHistnamePairs,
 
 
 
-def loadDataFast (paths, treename, branches, prefix = '', xsec = None, ignore = None, keepOnly = None, DSIDvar = 'DSID', isMCvar = 'isMC', Nevents = 29):
+def loadDataFast (paths, treename, branches, prefix = '', xsec = None, ignore = None, keepOnly = None, onlyData = False, onlyMC = False, DSIDvar = 'DSID', isMCvar = 'isMC', Nevents = 29, quiet = False):
     
-    print ""
+    if not quiet: print ""
     print "loadDataFast: Reading data from %d files." % len(paths)
 
     if len(paths) == 0:
-        print "loadDataFast: Exiting."
+        if not quiet: print "loadDataFast: Exiting."
         return dict()
 
     ievent = 0
@@ -489,45 +520,51 @@ def loadDataFast (paths, treename, branches, prefix = '', xsec = None, ignore = 
     for ipath, path in enumerate(paths):
 
         # Print progress.
-        print "\rloadDataFast:   [%-*s]" % (len(paths), '-' * (ipath + 1)),
-        sys.stdout.flush()
+        if not quiet: print "\rloadDataFast:   [%-*s]" % (len(paths), '-' * (ipath + 1)),
+        if not quiet: sys.stdout.flush()
 
         # Get file.
         f = TFile(path, 'READ')
 
         # Get DSID.
-        outputTree = f.Get(treename.split('/')[0] + '/outputTree')
+        if not quiet: print "output tree name:", '/'.join(treename.split('/')[:2]) + '/outputTree'
+        outputTree = f.Get('/'.join(treename.split('/')[:2]) + '/outputTree')
         for event in outputTree:
             DSID = eval('event.%s' % DSIDvar)
             isMC = eval('event.%s' % isMCvar)
             break
 
         if not DSID:
-            print "\rloadDataFast:   Could not retrieve DSID file output is probably empty. Skipping."
+            if not quiet: print "\rloadDataFast:   Could not retrieve DSID. File output is probably empty. Skipping %s" % path
             continue
 
         # Check whether to explicitly keep or ignore.
+        if onlyData and isMC:
+            continue
+        if onlyMC and not isMC:
+            continue
         if keepOnly and DSID and not keepOnly(DSID):
-            print "\rNot keeping DSID %d." % DSID
+            if not quiet: print "\rNot keeping DSID %d." % DSID
             continue
         elif ignore and DSID and ignore(DSID):
-            print "\rloadDataFast:   Ignoring DSID %d." % DSID
+            if not quiet: print "\rloadDataFast:   Ignoring DSID %d." % DSID
             continue
 
         # Get tree.
         t = f.Get(treename)
         
         if not t:
-            print "\rloadDataFast:   Tree '%s' was not found in file '%s'. Skipping." % (treename, path)
+            if not quiet: print "\rloadDataFast:   Tree '%s' was not found in file '%s'. Skipping." % (treename, path)
             continue
 
         # Load new data array.
         arr = tree2array(t,
                          branches = [prefix + br for br in branches],
                          include_weight = True,
-                         )                         
+                         )
+
         # Add cross sections weights.
-        if isMC and xsec and DSID:
+        if xsec and DSID and isMC:
 
             # Ignore of we didn't provide cross section information.
             if DSID not in xsec:
@@ -537,35 +574,216 @@ def loadDataFast (paths, treename, branches, prefix = '', xsec = None, ignore = 
             # Scale weight by cross section.
             arr['weight'] *= xsec[DSID]
 
-            # Add DSID array.
-            arr = append_fields(arr, 'DSID', np.ones(arr['weight'].shape) * DSID)
+            pass
 
+        # Add isMC array.
+        arr = append_fields(arr, 'isMC', np.ones(arr[prefix + branches[0]].shape) * isMC)
+
+        # Add DSID array.
+        try:
+            arr = append_fields(arr, 'DSID', np.ones(arr['isMC'].shape) * DSID)
+        except:
+            print arr
+            print arr['isMC']
+            print arr['isMC'].shape
+            print DSID
             pass
 
         # Append to existing data arra
         if data is None:
             data = arr
         else:
-            data = np.concatenate((data, arr))
+            try:
+                data = np.concatenate((data, arr))
+            except:
+                # If array contains only a single row...
+                # @TODO: Fix
+                pass
             pass
 
         pass
 
-    print ""
-
-    # Change branch names to remove prefix.
-    data.dtype.names = [name.replace(prefix, '') for name in data.dtype.names]
-    
     # Dict-ify.
     values = dict()
-    for branch in data.dtype.names:
-        values[branch] = data[branch]
+    if data is not None:
+        for branch in data.dtype.names:
+            values[branch] = data[branch]
+            pass
+        pass
+
+    # Change branch names to remove prefix.
+    for key in values:
+        values[key.replace(prefix, '')] = values.pop(key)
         pass
 
     return values
 
 
 
+
+def loadDataFast_ (tree, variables, prefix = ''):
+
+    # Load new data array.
+    arr = tree2array(tree,
+                     branches = [prefix + var for var in variables], # if var not in vec_names],
+                     include_weight = True,
+                     )
+
+    values = dict()
+    for var in arr.dtype.names:
+        values[var] = arr[var].tolist()
+        pass
+
+    return values
+
+def loadData_ (tree, variables, prefix = ''):
+
+    # -- Loading characters
+    loadingCharacters  = ['\\', '|', '/', '-']
+    iLoadingCharacter  = 0
+    nLoadingCharacters = len(loadingCharacters)
+
+    # -- Get number of entries in tree
+    Nevents = tree.GetEntries()
+
+    # -- Set up objects for reading tree.
+    values = dict()
+    for var in variables + ['weight'] :
+        values[var] = list()        
+        #tree.SetBranchAddress( var if var == 'weight' else prefix + var, branch[var])
+        tree.SetBranchStatus( var if var == 'weight' else prefix + var, 1)
+
+        pass
+
+    # -- Read tree
+    ievent = 0
+    while tree.GetEntry(ievent):
+        # -- Break early, if needed.
+        if Nevents is not None and ievent == Nevents:
+            break
+        
+        for var in variables + ['weight']:
+            #values[var].append( branch[var][0] )
+            values[var].append( eval('tree.%s' % var) )
+            pass
+        ievent += 1
+        
+        if ievent % 10000 == 0:
+            print "\rloadData: [%s]" % loadingCharacters[iLoadingCharacter],
+            sys.stdout.flush()
+            iLoadingCharacter = (iLoadingCharacter + 1) % nLoadingCharacters
+            pass
+        
+        pass
+
+    return values
+
+def loadData (paths, treename, branches, prefix = '', xsec = None, ignore = None, keepOnly = None, onlyData = False, onlyMC = False, DSIDvar = 'DSID', isMCvar = 'isMC', Nevents = 29, fast = True):
+    
+    print ""
+    print "loadData: Reading data from %d files %s 'fast' flag." % (len(paths), "using" if fast else "without")
+
+    if len(paths) == 0:
+        print "loadData: Exiting."
+        return dict()
+
+    ievent = 0
+
+    # Initialise data array.
+    data = None
+
+    # Initialise DSID variable.
+    DSID = None
+    isMC = None
+
+    # Loop paths.
+    values = dict()
+    for ipath, path in enumerate(paths):
+
+        # Print progress.
+        print "\rloadData:   [%-*s]" % (len(paths), '-' * (ipath + 1)),
+        sys.stdout.flush()
+
+        # Get file.
+        f = TFile(path, 'READ')
+
+        # Get DSID.
+        outputTree = f.Get('/'.join(treename.split('/')[0:2]) + '/outputTree')
+        for event in outputTree:
+            DSID = eval('event.%s' % DSIDvar)
+            isMC = eval('event.%s' % isMCvar)
+            break
+
+        if not DSID:
+            print "\rloadData:   Could not retrieve DSID file output is probably empty. Skipping."
+            continue
+
+        # Check whether to explicitly keep or ignore.
+        if onlyData and isMC:
+            continue
+        if onlyMC and not isMC:
+            continue
+        if keepOnly and DSID and not keepOnly(DSID):
+            print "\rNot keeping DSID %d." % DSID
+            continue
+        elif ignore and DSID and ignore(DSID):
+            print "\rloadData:   Ignoring DSID %d." % DSID
+            continue
+
+        # Get tree.
+        t = f.Get(treename)
+
+        if not t:
+            print "\rloadData:   Tree '%s' was not found in file '%s'. Skipping." % (treename, path)
+            continue
+
+        # Load data using under-the-hood function
+        if fast:
+            current_values = loadDataFast_(t, branches, prefix)
+        else:
+            current_values = loadData_(t, branches, prefix)
+            pass
+
+
+        # Add cross sections weights.
+        if xsec and DSID: # and isMC:
+
+            # Ignore of we didn't provide cross section information.
+            if DSID not in xsec:
+                print "\rloadData:   Skipping DSID %d (no sample info)." % DSID
+                continue
+
+            # Scale weight by cross section.
+            #current_values['weight'] *= xsec[DSID]
+            current_values['weight'] = (np.array(current_values['weight']) *  xsec[DSID]).tolist()
+
+            pass
+
+        # Add isMC array.
+        current_values['isMC'] = (np.ones_like(current_values[prefix + branches[0]]) * isMC).tolist()
+
+        # Add DSID array.
+        current_values['DSID'] = (np.ones_like(current_values[prefix + branches[0]]) * DSID).tolist()
+
+        # Append to existing data arra
+        if values:
+            #values = { key : np.concatenate((values[key], current_values[key])) for key in values }
+            for key in values:
+                values[key] += current_values[key]
+                pass
+        else:
+            values = current_values
+        pass
+
+    # Change branch names to remove prefix.
+    for key in values:
+        values[key.replace(prefix, '')] = values.pop(key)
+        pass
+
+    return values
+
+
+'''
 def loadData (paths, treename, variables, prefix = '', xsec = None, ignore = None, DSIDvar = 'DSID', Nevents = None):
     """ Read in data arrays from TTree. """
     values = dict()
@@ -666,6 +884,7 @@ def loadData (paths, treename, variables, prefix = '', xsec = None, ignore = Non
     print ""
 
     return values
+'''
 
 def displayName (var, latex = False):
     output = var
@@ -675,6 +894,7 @@ def displayName (var, latex = False):
     elif var == "tau21_ut":             output = "#tau_{21,untrimmed}"
     elif var == "tau21_mod_rhoPrime":   output = "#tilde{#tau}_{21} "
     elif var == "tau21_mod_rhoDDT":     output = "#tau_{21}^{DDT}"
+    elif var == "tau21DDT":             output = "#tau_{21}^{DDT}"
     elif var == "tau21_SDDT":           output = "#tilde{#tau}_{21}^{(S)DDT}"
     # D2
     elif var == "D2":                   output = "D_{2}"
@@ -683,6 +903,13 @@ def displayName (var, latex = False):
     # Kinematic variables
     elif var.lower() == "pt":           output = "p_{T} "
     elif var.lower() == "m":            output = "M"
+    elif var.lower() == "eta":          output = "#eta"
+    elif var.lower() == "theta":        output = "#theta"
+    elif var.lower() == "phi":          output = "#phi"
+    elif var.lower() == "qoverp":       output = "q/p"
+    elif var.lower() == "mu":           output = "#mu"
+    elif var.lower() == "d0":           output = "d_{0}"
+    elif var.lower() == "z0":           output = "z_{0}"
     # rho
     elif var == "rho":                  output = "#rho"
     elif var == "rho_ut":               output = "#rho_{untrimmed}"
@@ -697,10 +924,13 @@ def displayName (var, latex = False):
     return r'$%s$' % output.replace('#', '\\') if latex else output
 
 def displayUnit (var):
-    if   var.lower() == 'pt':    return 'GeV'
-    elif var.lower() == 'm':     return 'GeV'
-    elif var.lower() == "logm":  return "log(%s)" % displayUnit("m")
-    elif var.lower() == "logpt": return "log(%s)" % displayUnit("pt")
+    if   var.lower() == 'pt':     return 'GeV'
+    elif var.lower() == 'm':      return 'GeV'
+    elif var.lower() == 'qoverp': return 'GeV^{-1}'
+    elif var.lower() == 'd0':     return 'mm'
+    elif var.lower() == 'z0':     return 'mm'
+    elif var.lower() == "logm":   return "log(%s)" % displayUnit("m")
+    elif var.lower() == "logpt":  return "log(%s)" % displayUnit("pt")
     return ''
 
 def displayNameUnit (var, latex = False):
