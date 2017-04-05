@@ -73,7 +73,7 @@ def loadXsec (path):
                 if int(fields[2]) == 0:
                     continue
                 #xsec[int(fields[0])] = float(fields[1]) / float(fields[2]) * float(fields[3])
-                xsec[int(fields[0])] = float(fields[1]) / float(fields[3]) # @TEMP: Assuming sum-of-weights normalisation included in per-event MC weights
+                xsec[int(fields[0])] = float(fields[1]) * float(fields[3]) # @TEMP: Assuming sum-of-weights normalisation included in per-event MC weights
             except:
                 # If data. (Ignore?)
                 xsec[int(fields[0])] = float(fields[1]) # 1.
@@ -281,9 +281,6 @@ def makePlot (pathHistnamePairs,
     # Variable declarations
     if not colours:
         colours = [kViolet + 7, kAzure + 7, kTeal, kSpring - 2, kOrange - 3, kPink]
-        #colours = [kRed   + i * 2 for i in range(3)] + \
-        #          [kBlue  + i * 2 for i in range(3)] + \
-        #          [kGreen + i * 2 for i in range(3)]
         pass
 
     if not markers:
@@ -483,7 +480,7 @@ def makePlot (pathHistnamePairs,
 
     # Text.
     if textOpts:
-        drawText( *[v for _,v in textOpts._asdict().items()] )
+        drawText( *[v for _,v in textOpts._asdict().items()])
         pass
 
     # Legend.
@@ -559,8 +556,7 @@ def loadDataFast (paths, treename, branches, prefix = '', xsec = None, ignore = 
 
         # Load new data array.
         arr = tree2array(t,
-                         branches = [prefix + br for br in branches],
-                         include_weight = True,
+                         branches = [prefix + br for br in branches] + ['weight'], 
                          )
 
         # Add cross sections weights.
