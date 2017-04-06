@@ -69,15 +69,13 @@ def loadXsec (path):
             if line == '' or line.startswith('#'):
                 continue
             fields = [f.strip() for f in line.split(',')]
-            try:
-                if int(fields[2]) == 0:
-                    continue
-                #xsec[int(fields[0])] = float(fields[1]) / float(fields[2]) * float(fields[3])
-                xsec[int(fields[0])] = float(fields[1]) * float(fields[3]) # @TEMP: Assuming sum-of-weights normalisation included in per-event MC weights
-            except:
-                # If data. (Ignore?)
-                xsec[int(fields[0])] = float(fields[1]) # 1.
+            
+            if fields[2] == 'Data': 
                 continue
+
+            # @TEMP: Assuming sum-of-weights normalisation included in per-event MC weights
+            xsec[int(fields[0])] = float(fields[1]) * float(fields[3])
+
             pass
         pass
     return xsec
