@@ -2,11 +2,11 @@ from ROOT  import *
 from array import *
 
 # Global style variables.
-font = 43 # 42
+font = 42 # 43 # 42
 
-fontSizeS = 18 # 0.035 # 0.035
-fontSizeM = 19 #0.038  # 0.040
-fontSizeL = 20 #0.040
+fontSizeS = 0.035 # 18 # 0.035 # 0.035
+fontSizeM = 0.038 # 19 # 0.038  # 0.040
+fontSizeL = 0.040 # 20 # 0.040
 
 kMyBlue  = 1001;
 myBlue   = TColor(kMyBlue,   0./255.,  30./255.,  59./255.)
@@ -33,7 +33,7 @@ AStyle.SetStatColor(0)
 AStyle.SetPadRightMargin (0.05)
 AStyle.SetPadBottomMargin(0.15)
 AStyle.SetPadLeftMargin  (0.15)
-AStyle.SetPadTopMargin (0.05)
+AStyle.SetPadTopMargin   (0.05)
 AStyle.SetTitleOffset(1.2, 'x')
 AStyle.SetTitleOffset(1.8, 'y') # 1.5
 AStyle.SetTitleOffset(1.6, 'z')

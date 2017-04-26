@@ -7,6 +7,7 @@
 # Basic include(s)
 import sys
 import math
+import itertools
 
 from ROOT  import *
 from array import *
@@ -93,7 +94,7 @@ def getMaximum (h):
 
 
 
-def drawText (lines = [], c = None, pos = 'NW', qualifier = 'Internal simulation'):
+def drawText (lines = [], c = None, pos = 'NW', qualifier = 'Internal simulation', man_scale=1.):
     """ Draw text on TPad, including ATLAS line. """
     if not c: c = gPad
     c.cd()
@@ -104,6 +105,7 @@ def drawText (lines = [], c = None, pos = 'NW', qualifier = 'Internal simulation
         pass
 
     t = TLatex()
+    t.SetTextSize(t.GetTextSize() * man_scale)
 
     h = c.GetWh()
     w = c.GetWw()
@@ -113,10 +115,10 @@ def drawText (lines = [], c = None, pos = 'NW', qualifier = 'Internal simulation
     scale = (w/float(h) if w > h else h/float(w))
 
     x =       c.GetLeftMargin() + offset * scale
-    y = 1.0 - c.GetTopMargin()  - offset - t.GetTextSize() * 1.0
+    y = 1.0 - c.GetTopMargin()  - offset - t.GetTextSize() * 1.0 
 
     t.DrawLatexNDC(x, y, "#scale[1.15]{#font[72]{ATLAS}}#scale[1.05]{  %s}" % qualifier)
-    y -= ystep * 1.25
+    y -= ystep * 1.25 
 
     for line in lines:
         t.DrawLatexNDC(x, y, line)
@@ -136,9 +138,11 @@ def drawLegend (histograms, names, types = None, c = None,
                 ymax = None,
                 header = None,
                 categories = None,
+                categoryheader=None,
                 horisontal = 'R',
                 vertical   = 'T',
-                width = 0.30):
+                width = 0.30,
+                man_scale=1.):
     """ Draw legend on TPad. """
     if not c: c = gPad
     c.cd()
@@ -160,10 +164,10 @@ def drawLegend (histograms, names, types = None, c = None,
         print "drawLegend: WARNING, number of histograms (%d) and provided types (%d) don't match." % (N, len(types))
         return None
 
-    fontsize = gStyle.GetLegendTextSize()
+    fontsize = gStyle.GetLegendTextSize() * man_scale
 
     offset = 0.04
-    height = (min(N, len(names)) + (0 if header == None else 1) + (len(categories) if categories else 0))* fontsize * 1.25
+    height = (min(N, len(names)) + (0 if header == None else 1) + (0 if categoryheader == None else 2) + (len(categories) if categories else 0))* fontsize * 1.25
 
     # -- Setting x coordinates.
     if not (xmin or xmax):
@@ -200,6 +204,7 @@ def drawLegend (histograms, names, types = None, c = None,
         pass
 
     legend = TLegend(xmin, ymin, xmax, ymax)
+    legend.SetTextSize(fontsize)
 
     if header != None:
         legend.AddEntry(None, header, '')
@@ -209,8 +214,16 @@ def drawLegend (histograms, names, types = None, c = None,
         legend.AddEntry(h, n, t)
         pass
 
+    if categoryheader != None:
+        legend.AddEntry(None, "", '')
+        legend.AddEntry(None, categoryheader, '')
+        pass
+
     if categories:
         for icat, (name, hist, opt) in enumerate(categories):
+            hist.SetLineColor  (kGray+3)
+            hist.SetMarkerColor(kGray+3)
+            hist.SetFillColor  (kGray+2)
             legend.AddEntry(hist, name, opt)
             pass
         pass
@@ -245,8 +258,8 @@ def getPlotMinMax (histograms, log, padding = None, ymin = None):
 
 
 
-LegendOptions = namedtuple('LegendOptions', ['histograms', 'names', 'types', 'c', 'xmin', 'xmax', 'ymin', 'ymax', 'header', 'categories', 'horisontal', 'vertical','width'])
-LegendOptions.__new__.__defaults__ = ('LP', None, None, None,  None,  None, None, None, 'R', 'T', 0.30)
+LegendOptions = namedtuple('LegendOptions', ['histograms', 'names', 'types', 'c', 'xmin', 'xmax', 'ymin', 'ymax', 'header', 'categories', 'categoryheader', 'horisontal', 'vertical','width'])
+LegendOptions.__new__.__defaults__ = ('LP', None, None, None, None, None, None, None, None, 'R', 'T', 0.30)
 
 TextOptions = namedtuple('TextOptions', ['lines', 'c', 'pos', 'qualifier'])
 TextOptions.__new__.__defaults__ = ([], None, 'NW','Internal simulation',)
@@ -369,7 +382,7 @@ def makePlot (pathHistnamePairs,
 
 
     # Style.
-    (ymin, _ymax) = getPlotMinMax(histograms, logy, ymin = ymin, padding = padding)
+    (ymin, _ymax) = getPlotMinMax(histograms, logy, ymin = ymin, padding = padding) if histograms else (0,0)
     ymax = ymax if ymax else _ymax
     for i,h in enumerate(histograms):
 
@@ -430,7 +443,9 @@ def makePlot (pathHistnamePairs,
     c.cd()
 
     # Draw axes.
-    histograms[0].Draw('AXIS')
+    if histograms:
+        histograms[0].Draw('AXIS')
+        pass
     if xlim:
         c.Update()
         histograms[0].GetXaxis().SetRangeUser(xlim[0], xlim[1])
@@ -472,8 +487,10 @@ def makePlot (pathHistnamePairs,
         pass
 
     # Drawing axes for TGraph fucks up
-    if type(histograms[0]) in [TH1, TH2, TEfficiency]:
-        histograms[0].Draw('AXIS SAME')
+    if histograms:
+        if type(histograms[0]) in [TH1, TH2, TEfficiency]:
+            histograms[0].Draw('AXIS SAME')
+            pass
         pass
 
     # Text.
@@ -577,10 +594,11 @@ def loadDataFast (paths, treename, branches, prefix = '', xsec = None, ignore = 
         try:
             arr = append_fields(arr, 'DSID', np.ones(arr['isMC'].shape) * DSID)
         except:
-            print arr
-            print arr['isMC']
-            print arr['isMC'].shape
-            print DSID
+            print "WARNING: Couldn't concatenate DSID %s:" % DSID
+            print " ", arr
+            print " ",arr['isMC']
+            print " ",arr['isMC'].shape
+            print " ",DSID
             pass
 
         # Append to existing data arra
@@ -885,7 +903,8 @@ def displayName (var, latex = False):
 
     # tau21
     if   var == "tau21":                output = "#tau_{21}"
-    elif var == "tau21_ut":             output = "#tau_{21,untrimmed}"
+    elif var == "tau21_ut":             output = "#tau_{21,un-trimmed}"
+    elif var == "tau21_ungroomed":      output = "#tau_{21,un-trimmed}"
     elif var == "tau21_mod_rhoPrime":   output = "#tilde{#tau}_{21} "
     elif var == "tau21_mod_rhoDDT":     output = "#tau_{21}^{DDT}"
     elif var == "tau21DDT":             output = "#tau_{21}^{DDT}"
@@ -931,3 +950,8 @@ def displayNameUnit (var, latex = False):
     name = displayName(var, latex)
     unit = displayUnit(var)
     return name + (r" [%s]" % unit if unit else unit)
+
+
+def dict_product(dicts):
+    """ Returns cartesian product of dict entries, as a dict with one-entry value arrays, using itertools.product """
+    return (dict(itertools.izip(dicts, x)) for x in itertools.product(*dicts.itervalues()))

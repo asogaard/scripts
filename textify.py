@@ -34,7 +34,8 @@ import argparse
 
 parser = argparse.ArgumentParser(description='Convert ROOT file contents to text.')
 
-parser.add_argument('files', metavar='files', type=str, nargs='+',
+#parser.add_argument('files', metavar='files', type=str, nargs='+',
+parser.add_argument('--files', dest='files', type=str, nargs='+',
                     help='Files to combine')
 parser.add_argument('--output', dest='output',
                     required=True,
@@ -42,12 +43,16 @@ parser.add_argument('--output', dest='output',
 parser.add_argument('--treename', dest='treename',
                     required=True,
                     help='Name of the ROOT TTree to convert')
-parser.add_argument('--ignore', dest='ignore',
-                    action='append',
-                    help='Tree branches to ignore')
+parser.add_argument('--keep', dest='keep', type=str, nargs='*', default=list(),
+                    help='Tree branches to keep (defualt: all)')
+parser.add_argument('--ignore', dest='ignore', type=str, nargs='*', default=list(),
+                    help='Tree branches to ignore (defualt: none)')
 parser.add_argument('--weight_name', dest='weight_name', type=str,
                     default='weight',
-                    help='Name of weight branch')
+                    help='Name of weight branch default (defaults: "weight")')
+parser.add_argument('--nevents', dest='nevents', type=int,
+                    default=None,
+                    help='Number of events to process (default: all)')
 parser.add_argument('--xsec_file', dest='xsec_file',
                     default=None,
                     help='Path to cross-sections file')
@@ -59,6 +64,7 @@ def main ():
 
     # Parse command-line arguments
     args = parser.parse_args()
+
 
     # Load cross-sections
     xsec = None
@@ -101,10 +107,10 @@ def main ():
         
         if DSID is None:
             warning("Was unable to deduce dataset ID.")
-            continue
+            pass
 
         # Get structure numpy array from tree
-        array = tree2array(tree).view(np.recarray)
+        array = tree2array(tree, branches=args.keep if args.keep else None, stop=args.nevents).view(np.recarray)
         names = list(array.dtype.names)
 
         # Remove unwanted fields
@@ -118,7 +124,7 @@ def main ():
         header = ',\t'.join(array.dtype.names)
 
         # Scale weights by cross-section
-        if xsec:
+        if xsec and DSID:
             if DSID not in xsec:
                 warning("DSID {} was not for found among loaded cross-sections. Not scaling weights.".format(DSID))
             else:
